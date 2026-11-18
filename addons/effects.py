@@ -61,7 +61,7 @@ def set_volume(device, color1: RGBColor, color2: RGBColor, volume) -> list:
     colors: List[Optional[RGBColor]] = [None] * len(device.leds)
 
     def volume_gradient(percent: float) -> RGBColor:
-        color = RGBColor(255, 255, 255)
+        color = RGBColor(color2.red, color2.green, color2.blue)
         setattr(color, "alpha", interpolate_alpha(color1, color2, percent))
         return color
 
@@ -72,7 +72,7 @@ def set_volume(device, color1: RGBColor, color2: RGBColor, volume) -> list:
         filled_leds = int(displayed_volume)
         for position, led in enumerate(leds):
             if position < filled_leds:
-                color = RGBColor(255, 255, 255)
+                color = RGBColor(color2.red, color2.green, color2.blue)
                 setattr(color, "alpha", getattr(color1, "alpha", 1.0))
                 colors[led.id] = color
             elif position == filled_leds and displayed_volume > filled_leds:

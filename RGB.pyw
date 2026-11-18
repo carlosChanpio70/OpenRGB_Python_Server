@@ -1,3 +1,5 @@
+import datetime
+
 from openrgb import OpenRGBClient
 import time
 from addons.color import Color
@@ -12,12 +14,6 @@ color_2_percentage = 0.2
 gradient_min_steps = 4
 gradient_max_steps = 6
 names = ["Corsair Vengeance RGB Pro", "MSI MPG B550 GAMING PLUS (MS-7C56)"]
-    
-purple = Color()
-purple.set_hex("#5200b0")
-white = Color()
-white.set_hsl(0, 0, 100)
-colors = [purple, white]
 
 def startup():
     """
@@ -84,7 +80,29 @@ def main():
             print(e)
             client, devices = startup()
 
+def color_selector():
+    purple = Color()
+    purple.set_hex("#5200b0")
+    white = Color()
+    white.set_hex("#ffffff")
+    yellow = Color()
+    yellow.set_hex("#ffd900")
+    red = Color()
+    red.set_hex("#ff0000")
+    
+    today = datetime.date.today()
+    months = []
+    for month in range(1, 13):
+        months.append(datetime.date(month=month, day=today.day, year=today.year))
+    
+    global colors
+    if today in months[10:12]:
+        colors = [red, yellow]
+    else:
+        colors = [purple, white]
+
 if __name__ == "__main__":
     volume = VolumeMonitor()
     volume.start()
+
     main()
