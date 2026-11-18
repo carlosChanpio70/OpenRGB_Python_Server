@@ -38,9 +38,9 @@ def startup():
 
                     devices.add_device(device, color1, color2, color_2_percentage)
                     if device.name == names[1]:
-                        devices.set_color_correction(device,zone_name="JRAINBOW2",hue_correction=-20.0)
+                        devices.set_color_correction(device,zone_name="JRAINBOW2",hue_correction=-15.0)
                     else:
-                        devices.set_color_correction(device,zone_index=0,hue_correction=-20.0)
+                        devices.set_color_correction(device,zone_index=0,hue_correction=-15.0)
                 return client,devices
         except Exception as e:
             print(e)
