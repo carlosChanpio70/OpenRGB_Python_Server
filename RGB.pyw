@@ -38,9 +38,9 @@ def startup():
 
                     devices.add_device(device, color1, color2, color_2_percentage)
                     if device.name == names[1]:
-                        devices.set_color_correction(device,zone_name="JRAINBOW2",hue_correction=-15.0)
+                        devices.set_color_correction(device,zone_name="JRAINBOW2",hue_correction=-10.0,color_index=2)
                     else:
-                        devices.set_color_correction(device,zone_index=0,hue_correction=-15.0)
+                        devices.set_color_correction(device,zone_index=0)
                 return client,devices
         except Exception as e:
             print(e)
@@ -50,7 +50,7 @@ def update_effects(device, devices, volume_level) -> None:
     devices.set_gradient(device, gradient_min_steps, gradient_max_steps)
 
     if device.name == names[1]:
-        devices.set_color_final(device, colors[0].get_color(hue_correction=-15.0), 0)
+        devices.set_color_final(device, colors[0].get_color(), 0)
     if names[0].casefold() in device.name.casefold():
         devices.set_volume(device, volume_level)
     devices.apply_final_layer(device)

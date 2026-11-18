@@ -1,5 +1,7 @@
 import random
-from addons.effects import (
+from typing import Optional
+from .color import ColorCorrection
+from .effects import (
     RGBColor,
     interpolate_alpha,
     set_base_color,
@@ -53,39 +55,41 @@ class Devices:
             setattr(blended, "alpha", output_alpha)
             old_layer[i] = blended
 
-    def _apply_correction(self, color: RGBColor, hue: float, sat: float, bright: float) -> RGBColor:
-        if color is None:
-            return None
-        return RGBColor(
-            int((color.red + hue) % 256),
-            int(max(0, min(255, color.green + sat))),
-            int(max(0, min(255, color.blue + bright))),
-        )
-
     def _get_corrections_for_position(self, device, position: int) -> list:
         """Get all corrections that apply to a specific LED position."""
         records = self.color_corrections.get(device.id, [])
         applicable = []
         
-        for pos, zidx, zname, hue, sat, bright in records:
+        for pos, zidx, zname, correction in records:
             if pos == position:
-                applicable.append((hue, sat, bright))
+                applicable.append(correction)
             elif pos is None:
                 try:
                     zone = self._get_zone(device, zidx, zname)
                     for led in zone.leds:
                         if led.id == position:
-                            applicable.append((hue, sat, bright))
+                            applicable.append(correction)
                             break
                 except ValueError:
                     pass
         
         return applicable
 
-    def _apply_all_corrections_to_color(self, device, color: RGBColor, position: int) -> RGBColor:
+    def _get_color_index(self, device, color: RGBColor) -> Optional[int]:
+        for index, palette_color in enumerate(self.colors.get(device.id, [])[:2], start=1):
+            if color is palette_color:
+                return index
+        return None
+
+    def _apply_all_corrections_to_color(
+        self, device, color: RGBColor, position: int, color_index: Optional[int] = None
+    ) -> RGBColor:
         """Apply all corrections for a specific LED position."""
-        for hue, sat, bright in self._get_corrections_for_position(device, position):
-            color = self._apply_correction(color, hue, sat, bright)
+        if color_index is None:
+            color_index = self._get_color_index(device, color)
+        for correction in self._get_corrections_for_position(device, position):
+            if correction.applies_to(color_index):
+                color = correction.apply(color)
         return color
 
     def _get_zone(self, device, zone_index=None, zone_name=None):
@@ -102,12 +106,22 @@ class Devices:
 
         
     def set_color_correction(self, device, position=None, zone_index=None, zone_name=None,
-                        hue_correction=0.0, saturation_correction=0.0, brightness_correction=0.0):
-        """Register a colour correction. Exactly one of position, zone_index, or zone_name must be provided."""
+                        hue_correction=0.0, saturation_correction=0.0, brightness_correction=0.0,
+                        color_index=ColorCorrection.ALL_COLORS):
+        """Register a correction; color_index 1/2 selects a palette color, 0/None disables it.
+
+        If color_index is omitted, the correction applies to both palette colors.
+        """
         if sum([position is not None, zone_index is not None, zone_name is not None]) != 1:
             raise ValueError("must specify exactly one of position, zone_index or zone_name")
-        
-        record = (position, zone_index, zone_name, hue_correction, saturation_correction, brightness_correction)
+
+        correction = ColorCorrection(
+            hue_correction,
+            saturation_correction,
+            brightness_correction,
+            color_index,
+        )
+        record = (position, zone_index, zone_name, correction)
         self.color_corrections.setdefault(device.id, []).append(record)
                 
     def get_colors(self, device) -> dict:
@@ -138,7 +152,14 @@ class Devices:
         
     def gradient(self, device) -> None:
         """Sets the gradient for a layer"""
-        def calculate_gradient(c1: RGBColor, c2: RGBColor, pct: float) -> RGBColor:
+        def correct_color(color: RGBColor, position: int) -> RGBColor:
+            return self._apply_all_corrections_to_color(
+                device, color, position, self._get_color_index(device, color)
+            )
+
+        def calculate_gradient(c1: RGBColor, c2: RGBColor, pct: float, position: int) -> RGBColor:
+            c1 = correct_color(c1, position)
+            c2 = correct_color(c2, position)
             progress = 1 - pct / 100
             color = RGBColor(
                 int(c1.red * (1 - progress) + c2.red * progress),
@@ -151,10 +172,10 @@ class Devices:
         base, target, timing, current = [self.get_layer(device, ln) for ln in self.layer_names[:4]]
         
         gradient_layer = [
-            base[led.id] if current[led.id] == timing[led.id]
+            correct_color(base[led.id], led.id) if current[led.id] == timing[led.id]
             else calculate_gradient(
                 base[led.id], target[led.id],
-                100 * (timing[led.id] / current[led.id])
+                100 * (timing[led.id] / current[led.id]), led.id,
             )
             for zone in device.zones for led in zone.leds
         ]
@@ -187,21 +208,15 @@ class Devices:
         self.set_timings(device, gradient_min_steps, gradient_max_steps)
         self.gradient(device)
         
-        # Apply color corrections to the final gradient layer
-        final_layer = self.get_layer(device, self.layer_names[4])
-        corrected_layer = [
-            self._apply_all_corrections_to_color(device, color, i) if color is not None else None
-            for i, color in enumerate(final_layer)
-        ]
-        self.set_layer(device, self.layer_names[4], corrected_layer)
-        
     def set_color_final(self, device, color: RGBColor, position: int) -> None:
         """Sets the final color for a specific LED in the final layer with corrections applied
         :param device: The device to set the color for
         :param color: The color to set
         :param position: The ID of the LED to set the color for"""
         
-        corrected_color = self._apply_all_corrections_to_color(device, color, position)
+        corrected_color = self._apply_all_corrections_to_color(
+            device, color, position, self._get_color_index(device, color)
+        )
         layer = self.get_layer(device, self.layer_names[4])
         layer[position] = corrected_color
         self.set_layer(device, self.layer_names[4], layer)

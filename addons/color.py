@@ -2,6 +2,51 @@ import colorsys
 from typing import Optional
 from openrgb.utils import RGBColor
 
+class ColorCorrection:
+    ALL_COLORS = object()
+
+    def __init__(
+        self,
+        hue_correction: float = 0.0,
+        saturation_correction: float = 0.0,
+        brightness_correction: float = 0.0,
+        color_index=ALL_COLORS,
+    ) -> None:
+        """Create a correction; hue is in degrees, saturation/brightness are RGB channel offsets."""
+        if color_index is not self.ALL_COLORS and (
+            color_index is not None
+            and (type(color_index) is not int or color_index not in (0, 1, 2))
+        ):
+            raise ValueError("color_index must be 0, 1, 2, or None")
+        self.hue_correction = hue_correction
+        self.saturation_correction = saturation_correction
+        self.brightness_correction = brightness_correction
+        self.color_index = color_index
+
+    def applies_to(self, color_index: Optional[int]) -> bool:
+        if self.color_index is self.ALL_COLORS:
+            return True
+        return self.color_index not in (None, 0) and self.color_index == color_index
+
+    def apply(self, color: RGBColor) -> RGBColor:
+        if color is None:
+            return None
+        if self.hue_correction % 360.0:
+            hue, saturation, value = colorsys.rgb_to_hsv(
+                color.red / 255.0, color.green / 255.0, color.blue / 255.0
+            )
+            color = RGBColor.fromHSV(
+                (hue * 360.0 + self.hue_correction) % 360.0,
+                saturation * 100.0,
+                value * 100.0,
+            )
+        return RGBColor(
+            color.red,
+            int(max(0, min(255, color.green + self.saturation_correction))),
+            int(max(0, min(255, color.blue + self.brightness_correction))),
+        )
+
+
 class Color():
     def __init__(self, red: int = 0, green: int = 0, blue: int = 0, alpha: float = 1.0) -> None:
         """Initialize color from RGB values, stored internally as HSL."""
