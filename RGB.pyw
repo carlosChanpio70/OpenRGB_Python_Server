@@ -104,5 +104,5 @@ def color_selector():
 if __name__ == "__main__":
     volume = VolumeMonitor()
     volume.start()
-
+    color_selector()
     main()
