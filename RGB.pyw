@@ -86,7 +86,7 @@ def color_selector():
     white = Color()
     white.set_hex("#ffffff")
     yellow = Color()
-    yellow.set_hex("#ffd900")
+    yellow.set_hex("#ffff00")
     red = Color()
     red.set_hex("#ff0000")
     
